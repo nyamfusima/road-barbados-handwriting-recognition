@@ -2,7 +2,7 @@
 
 - CER and WER via Levenshtein distance, no text normalisation (labels keep historic spelling).
 - Reports corpus-level (length-weighted) and per-line averages; calibrate against the leaderboard.
-- Final = cer_weight * CER + wer_weight * WER (starter-pack defaults 0.7 / 0.3; confirm on Zindi).
+- Final = cer_weight * CER + wer_weight * WER (0.5 / 0.5 per Zindi evaluation page).
 
 Usage
   python src/official_metric.py --gt val_gt.csv --pred val_pred.csv
@@ -35,7 +35,7 @@ def _rates(refs, hyps, unit):
     return corpus, per_line
 
 
-def score(refs, hyps, cer_weight: float = 0.7, wer_weight: float = 0.3) -> dict:
+def score(refs, hyps, cer_weight: float = 0.5, wer_weight: float = 0.5) -> dict:
     refs = [str(r) for r in refs]
     hyps = ["" if (h is None or (isinstance(h, float) and pd.isna(h))) else str(h) for h in hyps]
     cer_c, cer_l = _rates(refs, hyps, "char")
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--gt", required=True)
     ap.add_argument("--pred", required=True)
-    ap.add_argument("--cer-weight", type=float, default=0.7)
-    ap.add_argument("--wer-weight", type=float, default=0.3)
+    ap.add_argument("--cer-weight", type=float, default=0.5)
+    ap.add_argument("--wer-weight", type=float, default=0.5)
     a = ap.parse_args()
     print(score_csv(a.gt, a.pred, cer_weight=a.cer_weight, wer_weight=a.wer_weight))
