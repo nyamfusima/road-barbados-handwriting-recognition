@@ -3,6 +3,7 @@ data/
 *.csv
 *.zip
 manifest-*.json
+hey
 
 # Images
 *.jpg
