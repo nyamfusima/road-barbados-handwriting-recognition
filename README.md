@@ -34,13 +34,12 @@ python src/make_split.py   # writes reports/split_v1.json (train/val IDs, seed 4
   should validate on it so scores are comparable. Train.csv has no page or
   document column and contains many crops of the same formulaic phrases, so the
   split holds out contiguous blocks of rows rather than random lines.
-- **Metric is provisional.** The starter pack's `eval_metrics.py` imports `wer.py`
-  and `cer.py`, which are not included, and `weight_factor` is undocumented.
-  `src/official_metric.py` is a stand-in with the same function names
-  (`compute_weighted_wer` / `compute_weighted_cer`). It reports corpus-level and
-  per-line CER/WER, combined as 0.7/0.3 (starter code) and 0.5/0.5 (team brief),
-  and ignores `weight_factor`. Calibrate against the public leaderboard on early
-  submissions; swap in the official files if Zindi provides them.
+- **Metric.** Confirmed on the Zindi Evaluation tab: `final = 0.5 * CER + 0.5 * WER`,
+  length-weighted (total edit distance / total reference length). The starter pack's
+  `wer.py` / `cer.py` are still not included, so `src/official_metric.py` is our own
+  implementation with the same function names (`compute_weighted_wer` /
+  `compute_weighted_cer`); `weight_factor` is ignored. `score(refs, hyps)["final"]` is the
+  decision metric. Per-line and 0.7/0.3 variants are diagnostics only.
 - Before every upload: `python src/check_submission.py --sub submission.csv`
 
 ## Repo layout

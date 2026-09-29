@@ -5,13 +5,12 @@ The Zindi starter pack's eval_metrics.py imports `wer.py` and `cer.py`
 files were never shipped. The meaning of `weight_factor` is undocumented, so it
 is accepted here and IGNORED. Do not tune toward it until it is confirmed.
 
-Two variants are reported so we can calibrate against the public leaderboard:
-  * corpus: total edit distance / total reference length (long lines count more)
-  * line:   mean of per-line error rates (every line counts equally)
+CONFIRMED (Zindi Evaluation tab): final = 0.5 * CER + 0.5 * WER, length-weighted, i.e.
+total edit distance / total reference length over the whole set (long lines count more).
+`score()["final"]` is this number and is the team's decision metric.
 
-Two ways of combining CER and WER are reported until the Evaluation tab is confirmed:
-  * 0.7 * CER + 0.3 * WER   (from the starter code)
-  * 0.5 * CER + 0.5 * WER   (from the original team brief)
+The per-line variants (mean of per-line rates) and the 0.7/0.3 starter-code combination
+are still returned as diagnostics only. Do not choose models with them.
 
 The function names and result keys of compute_weighted_wer / compute_weighted_cer
 match what the starter eval_metrics.py expects, so the official files can replace
@@ -25,6 +24,7 @@ import argparse
 import pandas as pd
 
 COMBINATIONS = {"0.7/0.3": (0.7, 0.3), "0.5/0.5": (0.5, 0.5)}
+DECISION_METRIC = "final"  # corpus-level (length-weighted) 0.5 * CER + 0.5 * WER
 
 
 def edit_distance(a, b):
@@ -71,6 +71,7 @@ def score(refs, hyps):
     for basis, (c, w) in (("corpus", (cer_corpus, wer_corpus)), ("line", (cer_line, wer_line))):
         for name, (wc, ww) in COMBINATIONS.items():
             out[f"final_{basis}_{name}"] = wc * c + ww * w
+    out["final"] = out["final_corpus_0.5/0.5"]
     return out
 
 
