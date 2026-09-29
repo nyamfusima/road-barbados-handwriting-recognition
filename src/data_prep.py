@@ -5,10 +5,20 @@ Usage:
 """
 import argparse
 import os
+import re
 
 import pandas as pd
 
 EXPECTED_FILES = ["Train.csv", "Test.csv", "SampleSubmission.csv"]
+
+
+def clean_label(text):
+    """Shared label rule: trim the ends and collapse runs of spaces. Nothing else.
+
+    Historic spelling (publique, prsence) and markers (^ & ~ _) are part of the
+    answer and must never be normalised.
+    """
+    return re.sub(r" {2,}", " ", str(text)).strip()
 
 
 def main():
