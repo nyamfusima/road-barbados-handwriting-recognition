@@ -150,6 +150,7 @@ def main():
     model.generation_config.eos_token_id = tok.eos_token_id
     model.generation_config.max_new_tokens = a.max_new_tokens
     model.generation_config.no_repeat_ngram_size = 0          # repeated words are legitimate
+    model.encoder.pooler = None  # pooler is unused and untrained; leaving it in breaks DDP
     if a.grad_ckpt:
         model.gradient_checkpointing_enable()
 
