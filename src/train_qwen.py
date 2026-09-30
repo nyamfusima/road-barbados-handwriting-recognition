@@ -11,6 +11,10 @@ Images are resized to a fixed height (default 112 px, a multiple of 28) keeping 
 aspect ratio, with width capped, so long lines are never squashed and the number of
 vision tokens stays small (<= ~320 per line).
 
+Adaptive height (--max-img-height 196 --max-width 2800): small lines still get --img-height,
+tall scans get up to 196 px instead of being shrunk to 112. Vision tokens per image: 247 -> 367
+on average (1.5x), 202 -> 578 (2.9x) for the 25% tall scans. Expect roughly 1.3-1.5x training time.
+
 Outputs in --out: lora/ (adapter), val_predictions.csv, val_metrics.json,
 submission.csv (if --predict-test), run_config.json.
 """
@@ -41,9 +45,19 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def load_img(path: Path, height: int, max_width: int) -> Image.Image:
+def target_height(orig_h: int, min_height: int, max_height: int) -> int:
+    """Adaptive height: follow the original height in steps of 28 px (one Qwen image token),
+    clamped to [min_height, max_height]. Small lines keep min_height; tall scans get more pixels."""
+    return int(min(max(round(orig_h / 28) * 28, min_height), max_height))
+
+
+def load_img(path: Path, height: int, max_width: int, max_height: int = 0) -> Image.Image:
+    """max_height=0: every line is resized to `height` (original behaviour).
+    max_height>height: adaptive height, see target_height."""
     img = Image.open(path).convert("RGB")
     w, h = img.size
+    if max_height > height:
+        height = target_height(h, height, max_height)
     new_w = min(max_width, max(28, round(w * height / h)))
     new_h = height if new_w < max_width else max(28, round(h * max_width / w))
     return img.resize((new_w, new_h), Image.BICUBIC)
@@ -70,6 +84,9 @@ def main():
     ap.add_argument("--rank", type=int, default=16)
     ap.add_argument("--img-height", type=int, default=112)
     ap.add_argument("--max-width", type=int, default=2240)
+    ap.add_argument("--max-img-height", type=int, default=0,
+                    help="0 = off (all lines resized to --img-height). Set e.g. 196 (with --max-width 2800) for "
+                         "adaptive height: lines follow their original height between --img-height and this value")
     ap.add_argument("--max-new-tokens", type=int, default=64)
     ap.add_argument("--seed", type=int, default=3407)
     ap.add_argument("--smoke", action="store_true")
@@ -100,7 +117,7 @@ def main():
             finetune_attention_modules=True, finetune_mlp_modules=True,
             r=a.rank, lora_alpha=a.rank, lora_dropout=0, bias="none", random_state=a.seed)
 
-        train_data = [to_conv(load_img(files[i], a.img_height, a.max_width), clean(t))
+        train_data = [to_conv(load_img(files[i], a.img_height, a.max_width, a.max_img_height), clean(t))
                       for i, t in zip(tr.ID, tr.Target)]
         FastVisionModel.for_training(model)
         steps = dict(max_steps=40) if a.smoke else dict(num_train_epochs=a.epochs)
@@ -124,7 +141,7 @@ def main():
     def predict(ids):
         preds = []
         for n, i in enumerate(ids):
-            img = load_img(files[i], a.img_height, a.max_width)
+            img = load_img(files[i], a.img_height, a.max_width, a.max_img_height)
             text = tok.apply_chat_template(to_conv(img)["messages"], add_generation_prompt=True)
             inputs = tok(img, text, add_special_tokens=False, return_tensors="pt").to("cuda")
             gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False, use_cache=True)
