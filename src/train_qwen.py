@@ -75,6 +75,8 @@ def main():
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--predict-test", action="store_true")
     ap.add_argument("--zero-shot", action="store_true", help="skip training; predict with the base model")
+    ap.add_argument("--num-beams", type=int, default=1, help="beam search width at inference (1 = greedy)")
+    ap.add_argument("--load-lora", default=None, help="path to a saved LoRA dir; loads it and skips training")
     a = ap.parse_args()
 
     from unsloth import FastVisionModel, is_bf16_supported
@@ -92,9 +94,9 @@ def main():
     if a.smoke:
         tr, va = tr.sample(300, random_state=0), va.sample(48, random_state=0)
 
-    model, tok = FastVisionModel.from_pretrained(a.model, load_in_4bit=True,
+    model, tok = FastVisionModel.from_pretrained(a.load_lora or a.model, load_in_4bit=True,
                                                  use_gradient_checkpointing="unsloth")
-    if not a.zero_shot:
+    if not a.zero_shot and not a.load_lora:
         model = FastVisionModel.get_peft_model(
             model, finetune_vision_layers=True, finetune_language_layers=True,
             finetune_attention_modules=True, finetune_mlp_modules=True,
@@ -127,7 +129,7 @@ def main():
             img = load_img(files[i], a.img_height, a.max_width)
             text = tok.apply_chat_template(to_conv(img)["messages"], add_generation_prompt=True)
             inputs = tok(img, text, add_special_tokens=False, return_tensors="pt").to("cuda")
-            gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False, use_cache=True)
+            gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False, num_beams=a.num_beams, use_cache=True)
             preds.append(clean(tok.decode(gen[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)))
             if n % 100 == 0:
                 print(f"  predicted {n}/{len(ids)}", flush=True)

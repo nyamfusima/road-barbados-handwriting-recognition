@@ -38,6 +38,7 @@ Decision values: keep, rerun, improve, ensemble, drop.
 - Word splits/merges drive WER (space inserted 77x, deleted 55x)
 - Short lines (30-50 chars) worst: CER 7.7% vs 3.9% for 70-90 chars
 - Labels contain noise; some error is irreducible
+- Multi-line crops: no staff ruling on test convention; ~0.1% of images are multi-line; our 7B v1 over-read only 1/410 val lines -> no special handling
 
 ## Community findings (Zindi thread "Five things that DON'T work", 17 Sep)
 - Exact LB formula: 0.5*(1 - word_edits_per_line/12) + 0.5*(1 - char_edits_per_line/55); 1 word edit = 4.58 char edits
