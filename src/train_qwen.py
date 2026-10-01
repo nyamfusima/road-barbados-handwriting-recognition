@@ -11,6 +11,9 @@ Images are resized to a fixed height (default 112 px, a multiple of 28) keeping 
 aspect ratio, with width capped, so long lines are never squashed and the number of
 vision tokens stays small (<= ~320 per line).
 
+Faster prediction: --pred-batch 8 predicts 8 lines per batch instead of one at a time (measure the gain
+with a --smoke run first). Combine with --load-lora <saved lora dir> to re-predict without retraining.
+
 Outputs in --out: lora/ (adapter), val_predictions.csv, val_metrics.json,
 submission.csv (if --predict-test), run_config.json.
 """
@@ -56,6 +59,28 @@ def to_conv(img, text=None):
     return {"messages": msgs}
 
 
+def run_batches(keys, batch, fn, on_error=None):
+    """Run fn on batches of item indices, sorted by `keys` so similar items share a batch
+    (images of similar width need little padding), and return results in the ORIGINAL order.
+    fn(indices) -> list of results. If a batch raises, its items are retried one at a time."""
+    order = sorted(range(len(keys)), key=lambda k: keys[k])
+    out = [None] * len(keys)
+    for s in range(0, len(order), batch):
+        idx = order[s:s + batch]
+        try:
+            res = fn(idx)
+        except Exception as e:  # e.g. out of memory on a batch of wide images
+            if len(idx) == 1:
+                raise
+            print(f"  batch of {len(idx)} failed ({type(e).__name__}); retrying one at a time", flush=True)
+            if on_error:
+                on_error()
+            res = [fn([k])[0] for k in idx]
+        for k, r in zip(idx, res):
+            out[k] = r
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-dir", required=True)
@@ -77,6 +102,9 @@ def main():
     ap.add_argument("--zero-shot", action="store_true", help="skip training; predict with the base model")
     ap.add_argument("--num-beams", type=int, default=1, help="beam search width at inference (1 = greedy)")
     ap.add_argument("--load-lora", default=None, help="path to a saved LoRA dir; loads it and skips training")
+    ap.add_argument("--pred-batch", type=int, default=1,
+                    help="lines predicted per batch (1 = one at a time, the original behaviour). "
+                         "try 8 on a T4; a failing batch falls back to one at a time")
     a = ap.parse_args()
 
     from unsloth import FastVisionModel, is_bf16_supported
@@ -134,6 +162,35 @@ def main():
             if n % 100 == 0:
                 print(f"  predicted {n}/{len(ids)}", flush=True)
         return preds
+
+    if hasattr(tok, "tokenizer"):
+        tok.tokenizer.padding_side = "left"  # needed for batched generation
+
+    @torch.no_grad()
+    def predict_batched(ids):
+        keys = []
+        for i in ids:
+            w, h = Image.open(files[i]).size
+            keys.append(w / h)  # aspect ratio ~ resized width, so batches need little padding
+        done = [0]
+
+        def run(idx):
+            imgs = [load_img(files[ids[k]], a.img_height, a.max_width) for k in idx]
+            texts = [tok.apply_chat_template(to_conv(im)["messages"], add_generation_prompt=True) for im in imgs]
+            inputs = tok(imgs, texts, add_special_tokens=False, return_tensors="pt", padding=True).to("cuda")
+            gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False,
+                                 num_beams=a.num_beams, use_cache=True)
+            outs = tok.batch_decode(gen[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+            before = done[0]
+            done[0] += len(idx)
+            if done[0] // 100 > before // 100:
+                print(f"  predicted {done[0]}/{len(ids)}", flush=True)
+            return [clean(o) for o in outs]
+
+        return run_batches(keys, a.pred_batch, run, on_error=torch.cuda.empty_cache)
+
+    if a.pred_batch > 1:
+        predict = predict_batched  # noqa: F811
 
     val_pred = predict(va.ID.tolist())
     metrics = score(va.Target.map(clean).tolist(), val_pred)
