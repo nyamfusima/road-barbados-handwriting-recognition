@@ -70,6 +70,12 @@ def to_conv(img, text=None):
     return {"messages": msgs}
 
 
+def is_left_padded(attention_mask) -> bool:
+    """True if every row ends with a real token (mask 1 in the last column), i.e. any padding is on
+    the LEFT. Right padding makes generate() continue after pad tokens and silently ruins output."""
+    return all(row[-1] == 1 for row in attention_mask.tolist())
+
+
 def run_batches(keys, batch, fn, on_error=None):
     """Run fn on batches of item indices, sorted by `keys` so similar items share a batch
     (images of similar width need little padding), and return results in the ORIGINAL order.
@@ -193,6 +199,9 @@ def main():
             imgs = [load_img(files[ids[k]], a.img_height, a.max_width, a.enhance) for k in idx]
             texts = [tok.apply_chat_template(to_conv(im)["messages"], add_generation_prompt=True) for im in imgs]
             inputs = tok(imgs, texts, add_special_tokens=False, return_tensors="pt", padding=True).to("cuda")
+            if len(idx) > 1 and not is_left_padded(inputs["attention_mask"]):
+                # never generate from a right-padded batch: raise so run_batches redoes these lines one at a time
+                raise RuntimeError("batch is right-padded; falling back to one line at a time")
             gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False,
                                  num_beams=a.num_beams, use_cache=True)
             outs = tok.batch_decode(gen[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)

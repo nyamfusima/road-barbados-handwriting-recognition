@@ -3,7 +3,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-from train_qwen import run_batches  # noqa: E402
+from train_qwen import is_left_padded, run_batches  # noqa: E402
 
 
 def test_order_restored_and_sorted_batches():
@@ -50,6 +50,14 @@ def test_single_item_failure_raises():
 
 def test_empty():
     assert run_batches([], 8, lambda idx: []) == []
+
+
+def test_is_left_padded():
+    import numpy as np
+    left = np.array([[0, 0, 1, 1], [1, 1, 1, 1]])
+    right = np.array([[1, 1, 0, 0], [1, 1, 1, 1]])
+    assert is_left_padded(left)
+    assert not is_left_padded(right)
 
 
 if __name__ == "__main__":
