@@ -122,6 +122,13 @@ def main():
     ap.add_argument("--pred-batch", type=int, default=1,
                     help="lines predicted per batch (1 = one at a time, the original behaviour). "
                          "try 8 on a T4; a failing batch falls back to one at a time")
+    ap.add_argument("--lora-alpha", type=int, default=0,
+                    help="LoRA alpha (0 = same as --rank, the original behaviour). The Zindi starter VLM uses 32 with rank 16")
+    ap.add_argument("--lora-dropout", type=float, default=0.0,
+                    help="LoRA dropout (original behaviour 0). The Zindi starter VLM uses 0.05")
+    ap.add_argument("--freeze-vision", action="store_true",
+                    help="train LoRA on the language layers only, leaving the vision encoder frozen "
+                         "(the Zindi starter VLM does this; the original behaviour trains both)")
     ap.add_argument("--enhance", action="store_true",
                     help="autocontrast + mild unsharp mask on every image, train and predict alike. "
                          "27%% of images are in the blurriest/darkest quartile and have ~2x the "
@@ -147,9 +154,10 @@ def main():
                                                  use_gradient_checkpointing="unsloth")
     if not a.zero_shot and not a.load_lora:
         model = FastVisionModel.get_peft_model(
-            model, finetune_vision_layers=True, finetune_language_layers=True,
+            model, finetune_vision_layers=not a.freeze_vision, finetune_language_layers=True,
             finetune_attention_modules=True, finetune_mlp_modules=True,
-            r=a.rank, lora_alpha=a.rank, lora_dropout=0, bias="none", random_state=a.seed)
+            r=a.rank, lora_alpha=(a.lora_alpha or a.rank), lora_dropout=a.lora_dropout,
+            bias="none", random_state=a.seed)
 
         train_data = [to_conv(load_img(files[i], a.img_height, a.max_width, a.enhance), clean(t))
                       for i, t in zip(tr.ID, tr.Target)]
