@@ -29,7 +29,7 @@ from pathlib import Path
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
 import pandas as pd  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageFilter, ImageOps  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from official_metric import score  # noqa: E402
@@ -44,8 +44,19 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def load_img(path: Path, height: int, max_width: int) -> Image.Image:
+def enhance_img(img: Image.Image) -> Image.Image:
+    """Autocontrast (stretch the tonal range, clipping the extreme 1% of pixels each end) plus a
+    mild unsharp mask. Applied before resize, while the original detail is still there. Generic,
+    code-driven, and the same for every image -- no per-image tuning."""
+    img = ImageOps.autocontrast(img, cutoff=1)
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=100, threshold=3))
+    return img
+
+
+def load_img(path: Path, height: int, max_width: int, enhance: bool = False) -> Image.Image:
     img = Image.open(path).convert("RGB")
+    if enhance:
+        img = enhance_img(img)
     w, h = img.size
     new_w = min(max_width, max(28, round(w * height / h)))
     new_h = height if new_w < max_width else max(28, round(h * max_width / w))
@@ -105,6 +116,10 @@ def main():
     ap.add_argument("--pred-batch", type=int, default=1,
                     help="lines predicted per batch (1 = one at a time, the original behaviour). "
                          "try 8 on a T4; a failing batch falls back to one at a time")
+    ap.add_argument("--enhance", action="store_true",
+                    help="autocontrast + mild unsharp mask on every image, train and predict alike. "
+                         "27%% of images are in the blurriest/darkest quartile and have ~2x the "
+                         "validation error of the sharpest quartile (reports/image_audit.csv)")
     a = ap.parse_args()
 
     from unsloth import FastVisionModel, is_bf16_supported
@@ -130,7 +145,7 @@ def main():
             finetune_attention_modules=True, finetune_mlp_modules=True,
             r=a.rank, lora_alpha=a.rank, lora_dropout=0, bias="none", random_state=a.seed)
 
-        train_data = [to_conv(load_img(files[i], a.img_height, a.max_width), clean(t))
+        train_data = [to_conv(load_img(files[i], a.img_height, a.max_width, a.enhance), clean(t))
                       for i, t in zip(tr.ID, tr.Target)]
         FastVisionModel.for_training(model)
         steps = dict(max_steps=40) if a.smoke else dict(num_train_epochs=a.epochs)
@@ -154,7 +169,7 @@ def main():
     def predict(ids):
         preds = []
         for n, i in enumerate(ids):
-            img = load_img(files[i], a.img_height, a.max_width)
+            img = load_img(files[i], a.img_height, a.max_width, a.enhance)
             text = tok.apply_chat_template(to_conv(img)["messages"], add_generation_prompt=True)
             inputs = tok(img, text, add_special_tokens=False, return_tensors="pt").to("cuda")
             gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False, num_beams=a.num_beams, use_cache=True)
@@ -175,7 +190,7 @@ def main():
         done = [0]
 
         def run(idx):
-            imgs = [load_img(files[ids[k]], a.img_height, a.max_width) for k in idx]
+            imgs = [load_img(files[ids[k]], a.img_height, a.max_width, a.enhance) for k in idx]
             texts = [tok.apply_chat_template(to_conv(im)["messages"], add_generation_prompt=True) for im in imgs]
             inputs = tok(imgs, texts, add_special_tokens=False, return_tensors="pt", padding=True).to("cuda")
             gen = model.generate(**inputs, max_new_tokens=a.max_new_tokens, do_sample=False,
