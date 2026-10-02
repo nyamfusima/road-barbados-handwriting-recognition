@@ -2,6 +2,7 @@
 data/
 *.csv
 !pseudo/*.csv
+!preds/**/*.csv
 *.zip
 manifest-*.json
 hey
@@ -30,6 +31,8 @@ models/
 # Submissions
 submission*.csv
 submissions/
+!submissions/
+!submissions/*.csv
 
 # --- Python ---
 __pycache__/
