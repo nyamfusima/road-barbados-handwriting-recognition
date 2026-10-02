@@ -15,6 +15,10 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 | 2026-09-30 ~16:55 | submission_7b_v2.csv | qwen-7b-v2 | 0.1170 | 0.8897 | 356 | yes (current best) | 7B, 3 ep, h140 |
 | 2026-10-01 | submission_7b_full.csv | qwen-7b-full | n/a (leaky 0.0908) | 0.8873 | - | yes | 7B, full data (train+val), 3 ep, h140 |
 | 2026-10-01 | submission_ens_7b3.csv | ens-7b3 | n/a | pending | - | candidate | Medoid 7B v1 + v2 + full (1, 1.2, 1.1); all 7B |
+| 2026-10-01 | submission_7b_r64.csv | qwen-7b-r64 | 0.1169 | 0.8908 | - | yes | 7B r64 |
+| 2026-10-01 | submission_ens_7b4.csv | ens-7b4 | n/a | 0.8969 | - | yes (current best) | medoid 7B v1 + v2 + full + r64 (1, 1.2, 1.1, 1.2) |
+| 2026-10-01 | v2 at h168 (submitted twice) | qwen-7b-v2-h168 | 0.1202 | 0.8859 | - | no | test-time height change hurts |
+| 2026-10-01 | submission_ens_7b5.csv | ens-7b5 | n/a | 0.8957 | - | no | adding weaker h168 member lowered score |
 
 ## Leaderboard reference
 - 29 Sep: 1st 0.9399, 5th 0.9331
@@ -30,6 +34,7 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 ## Final selection
 - RULE: only 7B-based (Apache 2.0) submissions are eligible. Excluded: qwen-lora-v1, qwen-3b-v2, ens3.
 - Pseudo-labelling on test is allowed if fully automated.
-- Submission 1: (TBD, best single 7B)
-- Submission 2: (TBD, best 7B-only ensemble)
+- Current best: ens-7b4 (0.8969, all 7B, licence-safe)
+- Submission 1: (TBD, best ensemble)
+- Submission 2: (TBD, best single 7B or second-best ensemble)
 - Reasoning (validation + public evidence):

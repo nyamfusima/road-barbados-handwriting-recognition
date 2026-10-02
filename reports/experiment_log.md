@@ -16,7 +16,13 @@ Metric: 0.5 x WER + 0.5 x CER (length-weighted). Leaderboard score is about 1 - 
 | 2026-09-30 | qwen-7b-v2 | vlm | split_v1 (410 val) | Qwen2.5-VL-7B QLoRA r16 | parent qwen-7b-v1; 3 ep, h140 | 0.179 | 0.055 | 0.1170 | Public 0.8897 (best); 3h54m train, 5h29m total; gain vs v1 within val noise | Keep (best single) |
 | 2026-09-30 | 3b-bigimg | vlm | split_v1 | Qwen2.5-VL-3B QLoRA | teammate's larger-image resize (exact settings TBC) | 0.205 | 0.070 | 0.1374 | No gain vs 3B v1 (0.1353); bigger images do not help | Drop |
 | 2026-09-30 | qwen-7b-full | vlm | full (train+val, 4,098 lines) | Qwen2.5-VL-7B QLoRA r16 | v2 recipe; 40 val lines duplicated as leaky sanity check; 1,539 steps | 0.138* | 0.044* | 0.0908* | *Leaky: even seen lines ~9% wrong -> underfitting signal. Public 0.8873 | Keep (ensemble member) |
-| 2026-10-01 | ens-7b3 | ensemble | test only | Medoid 7B v1 + 7B v2 + 7B full | w 1, 1.2, 1.1 | n/a | n/a | n/a | All 7B (Apache 2.0, licence-safe); public pending | pending |
+| 2026-10-01 | ens-7b3 | ensemble | test only | Medoid 7B v1 + 7B v2 + 7B full | w 1, 1.2, 1.1 | n/a | n/a | n/a | built, not submitted (superseded by ens-7b4) | Superseded |
+| 2026-10-01 | qwen-7b-v2-beam4 | vlm | split_v1 (410 val) | 7B v2 LoRA, inference only | num_beams 4 | 0.182 | 0.054 | 0.1179 | vs greedy 0.1170; no gain, 1.5x slower | Drop |
+| 2026-10-01 | qwen-7b-r64 | vlm | split_v1 (410 val) | Qwen2.5-VL-7B QLoRA r64 | v2 recipe, rank 16->64 (206M trainable), 9.0 s/step | 0.180 | 0.054 | 0.1169 | = v2; capacity not the bottleneck. Public 0.8908 | Keep (ensemble member) |
+| 2026-10-01 | 7b-enhance (teammate) | vlm | split_v1 | Qwen2.5-VL-7B QLoRA | --enhance (autocontrast + sharpen), h112, beams 3 | - | - | ~0.13 | worse than v2 | Drop |
+| 2026-10-01 | qwen-7b-v2-h168 | vlm | split_v1 (410 val) | 7B v2 LoRA, inference only | predict at h168 (trained at h140) | 0.183 | 0.057 | 0.1202 | public 0.8859; 71% identical to v2 | Drop |
+| 2026-10-01 | ens-7b4 | ensemble | test only | Medoid 7B v1 + v2 + full + r64 | w 1, 1.2, 1.1, 1.2 | n/a | n/a | n/a | Public 0.8969 (best); +0.007 over best single | Keep (best) |
+| 2026-10-01 | ens-7b5 | ensemble | test only | ens-7b4 + v2@h168 | w 1, 1.2, 1.1, 1.2, 0.8 | n/a | n/a | n/a | Public 0.8957; weaker member diluted the vote | Drop |
 
 Workstreams: `data-metric`, `trocr`, `vlm`, `ensemble`, `analysis`, `submission`.
 Decision values: keep, rerun, improve, ensemble, drop.
@@ -45,6 +51,8 @@ Decision values: keep, rerun, improve, ensemble, drop.
 - Val noise sd ~0.005 on 820 lines -> ~0.007 on our 410; gains < 0.01 are not reliable
 - Measured dead ends: lexicon recasing, markup (^ : &) fixes, OOV snapping, over-transcription guard, higher resolution for the high-res scan batch
 - ~1 in 70 lines mislabelled; clearly corrupted train rows may be dropped if documented (thread 33891)
+- Thread "OCR models, VLM, or custom?": a team slightly above 0.91 used Qwen + LoRA + GRPO + beam search and suspected bad data
+- Multi-line crops: no staff ruling on test convention; ~0.1% of images are multi-line; our 7B v1 over-read only 1/410 val lines -> no special handling
 
 ## Rules (staff rulings)
 - Only competition data for training/fine-tuning; no external datasets
@@ -52,13 +60,12 @@ Decision values: keep, rerun, improve, ensemble, drop.
 - Pseudo-labelling / self-training on test images IS allowed if fully automated
 
 ## Lessons so far
-- Validation tracks public within ~0.01; public set is small (~20-30% of test) and noisy
-- 3B -> 7B gave -0.013 val error; epochs/resolution changes gave gains within noise
-- Ensembles only help when members are similarly strong
-- Current recipe plateau: public ~0.887-0.890 across three 7B runs
+- Validation tracks public within ~0.01; val noise ~0.007 on 410 lines
+- Flat on 7B (vs 0.1170): beam search, rank 64, bigger images, enhance, test-time height change, full data
+- Ensembling equally strong 7B models works (+0.007 public); adding a weaker member hurts
+- The ~9% error on seen lines is mostly label noise / ambiguous handwriting, not model capacity
 
 ## Next levers (untested)
-- 7B with higher LoRA rank (capacity; underfitting signal)
-- Pseudo-labelling on test images (allowed)
-- Ensemble of strong 7B members only
-- Drop clearly mislabelled training rows (documented)
+- Pseudo-labelling: train on train + test pseudo-labels from ens-7b4 (--extra-train pseudo/test_pseudo_ens7b4.csv); val stays honest
+- Starter-pack settings on 7B: --freeze-vision --lr 3e-5 --lora-alpha 32 --lora-dropout 0.05 --grad-accum 16
+- More equally strong 7B members (seed / full-data variants) for the final ensemble

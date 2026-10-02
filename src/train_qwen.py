@@ -77,6 +77,10 @@ def main():
     ap.add_argument("--zero-shot", action="store_true", help="skip training; predict with the base model")
     ap.add_argument("--num-beams", type=int, default=1, help="beam search width at inference (1 = greedy)")
     ap.add_argument("--load-lora", default=None, help="path to a saved LoRA dir; loads it and skips training")
+    ap.add_argument("--extra-train", default=None, help="CSV with ID,Target of extra (pseudo-labelled) lines whose images are in --img-dir; appended to the training set only")
+    ap.add_argument("--freeze-vision", action="store_true", help="do not apply LoRA to the vision tower")
+    ap.add_argument("--lora-alpha", type=int, default=None, help="LoRA alpha (default = rank)")
+    ap.add_argument("--lora-dropout", type=float, default=0.0)
     a = ap.parse_args()
 
     from unsloth import FastVisionModel, is_bf16_supported
@@ -93,14 +97,19 @@ def main():
     tr, va = df[df.fold == "train"], df[df.fold == "val"]
     if a.smoke:
         tr, va = tr.sample(300, random_state=0), va.sample(48, random_state=0)
+    if a.extra_train:
+        ex = pd.read_csv(a.extra_train, encoding="utf-8-sig", keep_default_na=False)
+        ex = ex[~ex.ID.isin(va.ID) & ex.ID.isin(files.keys()) & (ex.Target.str.strip() != "")]
+        tr = pd.concat([tr[["ID", "Target"]], ex[["ID", "Target"]]], ignore_index=True)
+        print(f"[extra-train] added {len(ex)} lines -> {len(tr)} training lines", flush=True)
 
     model, tok = FastVisionModel.from_pretrained(a.load_lora or a.model, load_in_4bit=True,
                                                  use_gradient_checkpointing="unsloth")
     if not a.zero_shot and not a.load_lora:
         model = FastVisionModel.get_peft_model(
-            model, finetune_vision_layers=True, finetune_language_layers=True,
+            model, finetune_vision_layers=not a.freeze_vision, finetune_language_layers=True,
             finetune_attention_modules=True, finetune_mlp_modules=True,
-            r=a.rank, lora_alpha=a.rank, lora_dropout=0, bias="none", random_state=a.seed)
+            r=a.rank, lora_alpha=a.lora_alpha or a.rank, lora_dropout=a.lora_dropout, bias="none", random_state=a.seed)
 
         train_data = [to_conv(load_img(files[i], a.img_height, a.max_width), clean(t))
                       for i, t in zip(tr.ID, tr.Target)]
