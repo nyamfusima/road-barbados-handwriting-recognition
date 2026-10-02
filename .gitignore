@@ -1,6 +1,7 @@
 # --- Competition data (never commit) ---
 data/
 *.csv
+!pseudo/*.csv
 *.zip
 manifest-*.json
 hey
