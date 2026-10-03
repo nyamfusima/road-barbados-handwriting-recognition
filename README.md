@@ -138,7 +138,10 @@ Val ensembles leave out `full`, which was trained on the val lines. The test sub
 | ens-7b4-32b | ens-7b4 + 32b 1.3 | medoid | 0.89771 | 0.9011 |
 | sub_best / sub_rover5 | ens-7b4 + 32b 1.3 | char-ROVER | 0.89897 | 0.90115 |
 | sub_rover6 | rover5 + 32b_pseudo 1.0 | char-ROVER | 0.90093 | **0.9030** |
-| sub_rover7 | rover6 + wide 1.2 | char-ROVER | **0.90257** | pending |
+| sub_rover7 | rover6 + wide 1.2 | char-ROVER | **0.90257** | 0.9025 |
+
+**Selected finals:** `submissions/sub_rover6.csv` (best public, 0.9030) and `submissions/sub_rover7.csv`
+(best val, 0.9026; public 0.9025).
 
 The full sweep over methods and member subsets, with paired bootstrap CIs, is in
 [`reports/ensemble_eval.md`](reports/ensemble_eval.md). The per-run history is in
