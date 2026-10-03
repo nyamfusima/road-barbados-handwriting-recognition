@@ -23,6 +23,14 @@ Metric: 0.5 x WER + 0.5 x CER (length-weighted). Leaderboard score is about 1 - 
 | 2026-10-01 | qwen-7b-v2-h168 | vlm | split_v1 (410 val) | 7B v2 LoRA, inference only | predict at h168 (trained at h140) | 0.183 | 0.057 | 0.1202 | public 0.8859; 71% identical to v2 | Drop |
 | 2026-10-01 | ens-7b4 | ensemble | test only | Medoid 7B v1 + v2 + full + r64 | w 1, 1.2, 1.1, 1.2 | n/a | n/a | n/a | Public 0.8969 (best); +0.007 over best single | Keep (best) |
 | 2026-10-01 | ens-7b5 | ensemble | test only | ens-7b4 + v2@h168 | w 1, 1.2, 1.1, 1.2, 0.8 | n/a | n/a | n/a | Public 0.8957; weaker member diluted the vote | Drop |
+| 2026-10-02 | qwen-7b-starter (teammate) | vlm | split_v1 (410 val) | Qwen2.5-VL-7B QLoRA | starter settings: frozen vision, lr 3e-5, alpha 32, dropout 0.05, accum 16 | 0.239 | 0.090 | 0.1647 | much worse than v2 (0.1170): underfits | Drop |
+| 2026-10-02 | qwen-32b-smoke | vlm | split_v1 (48 val) | Qwen2.5-VL-32B QLoRA r16 (Colab A100) | smoke 40 steps, h140 | 0.365 | 0.173 | 0.269 | 3B smoke was 0.315 | Full run |
+| 2026-10-02 | qwen-32b-v2recipe (teammate, Colab A100) | vlm | split_v1 (410 val) | Qwen2.5-VL-32B QLoRA r16 | v2 recipe (3 ep, h140, accum 8) | 0.178 | 0.057 | 0.1171 | = 7B v2; only ~27% identical to 7Bs on test (very diverse) | Keep (ensemble member) |
+| 2026-10-02 | qwen-32b-pseudo (Colab A100) | vlm | split_v1 (410 val) | Qwen2.5-VL-32B QLoRA r16 | v2 recipe + 1,374 test pseudo-labels from ens-7b4; 1,899 steps, ~12 s/step, 6h32m train | 0.181 | 0.061 | 0.1208 | worse than clean 32B: pseudo-labels hurt; test preds 54% identical to ens-7b4 (copies the vote) | Drop as method; ensemble only if val eval says so |
+| 2026-10-02 | 7b-full-pseudo seed 7 (teammate, Kaggle) | vlm | full + pseudo | Qwen2.5-VL-7B QLoRA | full data + pseudo, seed 7 | - | - | - | no val possible (trained on val); pseudo shown to hurt | Exclude unless public proves otherwise |
+| 2026-10-02 | ens-7b4-32b | ensemble | test only | medoid 7B v1+v2+full+r64 + 32B | w 1, 1.2, 1.1, 1.2, 1.3 | n/a | n/a | n/a | public 0.9011 | Keep |
+| 2026-10-02 | ens-rover5 | ensemble | val + test | char-level ROVER, same 5 members | same weights | | | val LB 0.8990 vs medoid 0.8977 (+0.0013, CI -0.0007..+0.0032) | public 0.90115 (best) | Keep (current best) |
+| 2026-10-03 | ens-rover6 | ensemble | val only (test built, not submitted) | char-level ROVER, 5 members + 32b_pseudo (w=1.0) | same weights + 32bp=1.0 | | | val LB 0.90093 vs S4 char-ROVER 0.89897 (+0.00196, CI -0.00052..+0.00455) | submissions/sub_rover6.csv built; public pending; w=1.0 beat w=0.7 for 32bp | Keep (recommend submit) |
 
 Workstreams: `data-metric`, `trocr`, `vlm`, `ensemble`, `analysis`, `submission`.
 Decision values: keep, rerun, improve, ensemble, drop.
@@ -53,6 +61,10 @@ Decision values: keep, rerun, improve, ensemble, drop.
 - ~1 in 70 lines mislabelled; clearly corrupted train rows may be dropped if documented (thread 33891)
 - Thread "OCR models, VLM, or custom?": a team slightly above 0.91 used Qwen + LoRA + GRPO + beam search and suspected bad data
 - Multi-line crops: no staff ruling on test convention; ~0.1% of images are multi-line; our 7B v1 over-read only 1/410 val lines -> no special handling
+- Competition CLOSES 04 Oct 2026 (reveal 05 Oct), not 05 Oct
+- The 21 "corrupted" IDs were posted by a participant (Alpcan_Cepik), NOT confirmed by staff; staff only allow excluding clearly corrupted rows with documentation. Only 3 are corroborated by another participant: 79tMUVyfIdy3GzkG (empty/unreadable), F8DYDDp2AvW9Dytw and JU7lRwk3jKkus24Z (text doesn't match label). We exclude only these 3 in new runs.
+- Kansallisarkisto/multicentury-htr-model is Apache-2.0 (allowed) but TrOCR-based (384x384 squash) -> skipped
+- Pseudo-labelling measured: hurts (32B 0.1171 -> 0.1208)
 
 ## Rules (staff rulings)
 - Only competition data for training/fine-tuning; no external datasets
@@ -60,12 +72,12 @@ Decision values: keep, rerun, improve, ensemble, drop.
 - Pseudo-labelling / self-training on test images IS allowed if fully automated
 
 ## Lessons so far
-- Validation tracks public within ~0.01; val noise ~0.007 on 410 lines
-- Flat on 7B (vs 0.1170): beam search, rank 64, bigger images, enhance, test-time height change, full data
-- Ensembling equally strong 7B models works (+0.007 public); adding a weaker member hurts
-- The ~9% error on seen lines is mostly label noise / ambiguous handwriting, not model capacity
+- Single models plateau at ~0.117 val (7B and 32B alike); capacity, beams, image size, preprocessing, starter settings and pseudo-labels don't break it
+- Diversity is the working lever: adding the 32B (27% overlap) gave +0.004 public; weaker members dilute the vote
+- Char-level ROVER ≈ medoid (+0.0013 val, +0.00005 public): vote method matters little, members matter more
+- Local LB-formula val score tracks public (medoid val 0.8977 vs public 0.9011)
 
-## Next levers (untested)
-- Pseudo-labelling: train on train + test pseudo-labels from ens-7b4 (--extra-train pseudo/test_pseudo_ens7b4.csv); val stays honest
-- Starter-pack settings on 7B: --freeze-vision --lr 3e-5 --lora-alpha 32 --lora-dropout 0.05 --grad-accum 16
-- More equally strong 7B members (seed / full-data variants) for the final ensemble
+## Next levers
+- 7B width fix: --max-width 4480 at h140 (lines >16:1 were being shrunk below h140), 3 bad rows excluded (Kaggle, Sat 3 Oct)
+- Clean 32B seed 7 (teammate's Colab, Sat 3 Oct)
+- Final vote: char-ROVER over the strongest diverse members; pick 2 finals before close on 4 Oct

@@ -1,7 +1,7 @@
 # Submissions log
 
 Run `python src/check_submission.py <file>` before every upload.
-Limits: 5 per day, 200 total. Competition closes 05 Oct 2026 (confirm time on Zindi).
+Limits: 5 per day, 200 total. Competition CLOSES 04 Oct 2026 (reveal 05 Oct).
 Leaderboard score: higher is better (about 1 - error).
 Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust validation first.
 
@@ -19,6 +19,8 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 | 2026-10-01 | submission_ens_7b4.csv | ens-7b4 | n/a | 0.8969 | - | yes (current best) | medoid 7B v1 + v2 + full + r64 (1, 1.2, 1.1, 1.2) |
 | 2026-10-01 | v2 at h168 (submitted twice) | qwen-7b-v2-h168 | 0.1202 | 0.8859 | - | no | test-time height change hurts |
 | 2026-10-01 | submission_ens_7b5.csv | ens-7b5 | n/a | 0.8957 | - | no | adding weaker h168 member lowered score |
+| 2026-10-02 | submission_ens_7b4_32b.csv | ens-7b4-32b | n/a | 0.9011 | ~332 | yes | medoid 4x7B + 32B |
+| 2026-10-02 | submissions/sub_best.csv | ens-rover5 | val 0.8990 | 0.90115 | - | yes (current best) | char-ROVER, 221 lines differ from medoid |
 
 ## Leaderboard reference
 - 29 Sep: 1st 0.9399, 5th 0.9331
@@ -34,7 +36,7 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 ## Final selection
 - RULE: only 7B-based (Apache 2.0) submissions are eligible. Excluded: qwen-lora-v1, qwen-3b-v2, ens3.
 - Pseudo-labelling on test is allowed if fully automated.
-- Current best: ens-7b4 (0.8969, all 7B, licence-safe)
-- Submission 1: (TBD, best ensemble)
-- Submission 2: (TBD, best single 7B or second-best ensemble)
+- Current best: ens-rover5 (0.90115); runner-up ens-7b4-32b medoid (0.9011)
+- Plan: Final 1 = best validated vote (char-ROVER); Final 2 = structurally different vote (e.g. medoid, or different member set)
+- Deadline: select both before close on 04 Oct 2026
 - Reasoning (validation + public evidence):
