@@ -175,3 +175,39 @@ Final ensemble including the new members:
 ```bash
 # TBD: python src/ensemble_rover.py --method rover-char --preds ... --weights ... --margin 0.0 --out submissions/sub_roverN.csv
 ```
+
+## 5. qwen3-8b (Qwen3-VL-8B-Instruct, Transformers + PEFT, no Unsloth)
+
+`src/train_qwen3.py`: same data, split, prompt, cleaning, metric and output files as `train_qwen.py`.
+LoRA r16 (alpha 16) on the language q/k/v/o/gate/up/down and vision-block attention/MLP linears;
+lr 2e-4, 5% warmup, bs 1 x accum 8, 3 epochs, greedy. Image sides are rounded to multiples of 32, so
+`--img-height 140` trains on 128 px lines. 32B: `--model Qwen/Qwen3-VL-32B-Instruct --load-4bit`.
+Checkpoints every 200 steps in `{out}/ckpt`; rerun the same command with `--resume` after a disconnect.
+
+Colab A100 (bf16). Drive at /content/drive, repo at /content/repo, data at /content/work.
+```bash
+cd /content/repo && git pull
+pip install -q "transformers>=4.57" peft accelerate bitsandbytes
+
+# smoke: 40 steps + 48 val lines, prints s/step, s/line and the full-run estimate (< 20 min)
+python src/train_qwen3.py --data-dir /content/work --img-dir /content/work/images \
+    --split /content/work/splits/split_v1.csv --out /content/drive/MyDrive/barbados/qwen3-8b-smoke \
+    --seed 3407 --img-height 140 --smoke
+
+# full run
+python src/train_qwen3.py --data-dir /content/work --img-dir /content/work/images \
+    --split /content/work/splits/split_v1.csv --out /content/drive/MyDrive/barbados/qwen3-8b \
+    --seed 3407 --img-height 140 --predict-test
+```
+
+Kaggle T4 (fp16 + loss scaling, 4-bit NF4 base):
+```bash
+python src/data_prep.py --raw-dir $DATA --skip-images --split-dir /kaggle/working/splits \
+    --report /kaggle/working/data_audit.md          # md5 must be 61d5a1a939e97a442dc635bcb63adb1d
+python src/train_qwen3.py --data-dir $DATA --img-dir $DATA/images/images \
+    --split /kaggle/working/splits/split_v1.csv --out /kaggle/working/runs/qwen3-8b \
+    --seed 3407 --img-height 140 --load-4bit --predict-test
+```
+
+Then: `cp {out}/val_predictions.csv preds/val/qwen3-8b.csv; cp {out}/submission.csv preds/test/qwen3-8b.csv`.
+- Val LB: TBD | Public: TBD | Ensemble weight: TBD
