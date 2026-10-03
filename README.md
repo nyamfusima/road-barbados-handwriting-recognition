@@ -107,9 +107,10 @@ The pseudo-label members depend on earlier ensembles. Build the ensemble first, 
 - ens-7b4 (medoid of v1, v2, full, r64) gives `pseudo/test_pseudo_ens7b4.csv`, which trains 32b_pseudo.
 - rover6 gives `pseudo/test_pseudo_rover6.csv`, which trains the upcoming pseudo members.
 
-From the committed `preds/`, the commands in `run_commands.md` rebuild `submissions/sub_rover6.csv`,
-`sub_rover7.csv`, `sub_best.csv` and `pseudo/test_pseudo_ens7b4.csv` byte for byte. Retraining on GPU is
-not bit-exact, so newly trained members will differ slightly from the committed predictions.
+**Note:** GPU training (Unsloth/QLoRA) is not fully deterministic, so freshly retrained members can differ
+slightly (~±0.001 val) from the committed predictions in `preds/`. The committed `preds/` files are the
+exact inputs used for our submissions, and the ensemble commands rebuild every submission byte-for-byte
+from them.
 
 ## Results
 
