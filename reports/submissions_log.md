@@ -21,6 +21,7 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 | 2026-10-01 | submission_ens_7b5.csv | ens-7b5 | n/a | 0.8957 | - | no | adding weaker h168 member lowered score |
 | 2026-10-02 | submission_ens_7b4_32b.csv | ens-7b4-32b | n/a | 0.9011 | ~332 | yes | medoid 4x7B + 32B |
 | 2026-10-02 | submissions/sub_best.csv | ens-rover5 | val 0.8990 | 0.90115 | - | yes (current best) | char-ROVER, 221 lines differ from medoid |
+| 2026-10-03 | submissions/sub_rover6.csv | ens-rover6 | val 0.9009 | 0.9030 | - | yes (current best, Final 1) | char-ROVER 6 incl. 32B-pseudo |
 
 ## Leaderboard reference
 - 29 Sep: 1st 0.9399, 5th 0.9331
@@ -36,7 +37,7 @@ Public LB = ~20-30% of test (~300-400 lines), so expect +/-0.01 noise. Trust val
 ## Final selection
 - RULE: only 7B-based (Apache 2.0) submissions are eligible. Excluded: qwen-lora-v1, qwen-3b-v2, ens3.
 - Pseudo-labelling on test is allowed if fully automated.
-- Current best: ens-rover5 (0.90115); runner-up ens-7b4-32b medoid (0.9011)
+- Current best: ens-rover6 (0.9030, Final 1); runner-up ens-rover5 (0.90115)
 - Plan: Final 1 = best validated vote (char-ROVER); Final 2 = structurally different vote (e.g. medoid, or different member set)
 - Deadline: select both before close on 04 Oct 2026
 - Reasoning (validation + public evidence):

@@ -94,3 +94,62 @@ core member.
 ### Decision
 Adding 32b_pseudo at weight 1.0 via char-level ROVER (S5) is the new best validated configuration
 (0.90093 vs 0.89897 for S4 char-ROVER, +0.00196 >= the 0.001 bar) -> see submissions/sub_rover6.csv.
+
+## 2026-10-03: with wide
+
+New member `wide` = Qwen2.5-VL-7B QLoRA, v2 recipe + `--max-width 4480` (width fix for lines >16:1
+that were being shrunk below the target height), split_v1_clean (3 bad rows excluded). Test overlap
+with 32b is 24.8% and with v2 is 38.8% -- confirms it is a genuinely diverse member, not a copy.
+
+Full run:
+
+`python scripts/eval_ensembles.py --val v1=preds/val/v1.csv v2=preds/val/v2.csv r64=preds/val/r64.csv 32b=preds/val/32b.csv 32bp=preds/val/32b_pseudo.csv wide=preds/val/wide.csv --weights v1=1 v2=1.2 r64=1.2 32b=1.3 32bp=1.0 wide=1.0`
+
+| Method | Members | LB score | Mean word edits/line | Mean char edits/line | Old val error |
+| --- | --- | --- | --- | --- | --- |
+| ALL given-weight rover-char (margin 0) | v1+v2+r64+32b+32bp+wide | 0.90193 | 1.7634 | 2.7049 | 0.10015 |
+| ALL given-weight rover (margin 0.5) | v1+v2+r64+32b+32bp+wide | 0.90100 | 1.7683 | 2.7854 | 0.10106 |
+| subset v1+r64+32b+32bp+wide rover (margin 0) | v1+r64+32b+32bp+wide | 0.90090 | 1.7415 | 2.9195 | 0.10098 |
+| ALL given-weight medoid (current prod) | v1+v2+r64+32b+32bp+wide | 0.90083 | 1.7756 | 2.7707 | 0.10121 |
+| subset v1+r64+32b+32bp+wide medoid | v1+r64+32b+32bp+wide | 0.90082 | 1.7683 | 2.8049 | 0.10116 |
+| ALL given-weight rover (margin 0) | v1+v2+r64+32b+32bp+wide | 0.90044 | 1.7610 | 2.8805 | 0.10153 |
+| ALL equal-weight rover (margin 0) | v1+v2+r64+32b+32bp+wide | 0.90024 | 1.7780 | 2.8244 | 0.10181 |
+| ALL equal-weight rover (margin 0.5) | v1+v2+r64+32b+32bp+wide | 0.90024 | 1.7780 | 2.8244 | 0.10181 |
+| ALL equal-weight medoid | v1+v2+r64+32b+32bp+wide | 0.89974 | 1.7927 | 2.8122 | 0.10230 |
+| subset v1+v2+r64+32b+32bp rover (margin 0) | v1+v2+r64+32b+32bp | 0.89948 | 1.7659 | 2.9634 | 0.10236 |
+| subset v2+r64+32b+32bp+wide rover (margin 0) | v2+r64+32b+32bp+wide | 0.89928 | 1.7780 | 2.9293 | 0.10262 |
+| subset v2+r64+32b+32bp+wide medoid | v2+r64+32b+32bp+wide | 0.89910 | 1.8000 | 2.8488 | 0.10294 |
+| subset v1+v2+32b+32bp+wide medoid | v1+v2+32b+32bp+wide | 0.89872 | 1.8049 | 2.8683 | 0.10336 |
+| subset v1+v2+r64+32b+32bp medoid | v1+v2+r64+32b+32bp | 0.89850 | 1.8049 | 2.8927 | 0.10346 |
+| subset v1+v2+32b+32bp+wide rover (margin 0) | v1+v2+32b+32bp+wide | 0.89821 | 1.7927 | 2.9805 | 0.10375 |
+| subset v1+v2+r64+32b+wide medoid | v1+v2+r64+32b+wide | 0.89658 | 1.8488 | 2.9024 | 0.10550 |
+| subset v1+v2+r64+32b+wide rover (margin 0) | v1+v2+r64+32b+wide | 0.89658 | 1.8195 | 3.0366 | 0.10537 |
+| subset v1+v2+r64+32bp+wide rover (margin 0) | v1+v2+r64+32bp+wide | 0.89623 | 1.8390 | 2.9854 | 0.10570 |
+| subset v1+v2+r64+32bp+wide medoid | v1+v2+r64+32bp+wide | 0.89603 | 1.8488 | 2.9634 | 0.10596 |
+| single: r64 | r64 | 0.88535 | 2.0317 | 3.3000 | 0.11674 |
+| single: v2 | v2 | 0.88513 | 2.0220 | 3.3683 | 0.11700 |
+| single: 32b | 32b | 0.88478 | 2.0049 | 3.4854 | 0.11725 |
+| single: wide | wide | 0.88237 | 2.0610 | 3.4927 | 0.11980 |
+| single: 32bp | 32bp | 0.88101 | 2.0390 | 3.7439 | 0.12085 |
+| single: v1 | v1 | 0.87963 | 2.1098 | 3.5707 | 0.12250 |
+
+### S6/S7 weight comparison (char-level ROVER, margin 0)
+
+| Set | LB score | Mean word edits/line | Mean char edits/line |
+| --- | --- | --- | --- |
+| S6 = v1,v2,r64,32b,32bp (current best) | 0.90093 | 1.7732 | 2.7707 |
+| S7 = S6 + wide (w=1.0) | 0.90193 | 1.7634 | 2.7049 |
+| S7b = S6 + wide (w=0.7) | 0.90183 | 1.7659 | 2.7049 |
+| S7c = S6 + wide (w=1.2) | **0.90257** | 1.7561 | 2.6683 |
+
+Best: **S7c, wide at weight 1.2** (beats weight 1.0 and 0.7).
+
+### Paired check: best (S7c) vs S6
+- Lines improved: 50, worsened: 46, unchanged: 314 (of 410)
+- Mean LB-score difference (best - baseline): 0.00164
+- Bootstrap 95% CI (1000 resamples of the 410 lines): [-0.00128, 0.00525]
+- CI straddles 0: the point gain clears the 0.001 bar but is not statistically conclusive at 410 lines.
+
+### Decision
+S7c (wide at weight 1.2, char-ROVER) is the new best validated configuration: 0.90257 vs 0.90093 for
+S6 (+0.00164 >= the 0.001 bar) -> submissions/sub_rover7.csv built with wide weight 1.2.

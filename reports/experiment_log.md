@@ -30,7 +30,9 @@ Metric: 0.5 x WER + 0.5 x CER (length-weighted). Leaderboard score is about 1 - 
 | 2026-10-02 | 7b-full-pseudo seed 7 (teammate, Kaggle) | vlm | full + pseudo | Qwen2.5-VL-7B QLoRA | full data + pseudo, seed 7 | - | - | - | no val possible (trained on val); pseudo shown to hurt | Exclude unless public proves otherwise |
 | 2026-10-02 | ens-7b4-32b | ensemble | test only | medoid 7B v1+v2+full+r64 + 32B | w 1, 1.2, 1.1, 1.2, 1.3 | n/a | n/a | n/a | public 0.9011 | Keep |
 | 2026-10-02 | ens-rover5 | ensemble | val + test | char-level ROVER, same 5 members | same weights | | | val LB 0.8990 vs medoid 0.8977 (+0.0013, CI -0.0007..+0.0032) | public 0.90115 (best) | Keep (current best) |
-| 2026-10-03 | ens-rover6 | ensemble | val only (test built, not submitted) | char-level ROVER, 5 members + 32b_pseudo (w=1.0) | same weights + 32bp=1.0 | | | val LB 0.90093 vs S4 char-ROVER 0.89897 (+0.00196, CI -0.00052..+0.00455) | submissions/sub_rover6.csv built; public pending; w=1.0 beat w=0.7 for 32bp | Keep (recommend submit) |
+| 2026-10-03 | ens-rover6 | ensemble | val only (test built, not submitted) | char-level ROVER, 5 members + 32b_pseudo (w=1.0) | same weights + 32bp=1.0 | | | val LB 0.90093 vs S4 char-ROVER 0.89897 (+0.00196, CI -0.00052..+0.00455) | submissions/sub_rover6.csv built; public 0.9030 (new best, Final 1); w=1.0 beat w=0.7 for 32bp | Keep (current best) |
+| 2026-10-03 | qwen-7b-wide | vlm | split_v1_clean (410 val, 3 bad rows excluded) | Qwen2.5-VL-7B QLoRA r16 | v2 recipe + --max-width 4480 | 0.183 | 0.057 | 0.1197 | width fix not better alone than v2 (0.1170); very diverse (25% identical to 32B on test) | ensemble member if val eval says so |
+| 2026-10-03 | ens-rover7 | ensemble | val only (test built, not submitted) | char-level ROVER, 6 members + wide (w=1.2) | same weights + wide=1.2 | | | val LB 0.90257 vs S6 char-ROVER 0.90093 (+0.00164, CI -0.00128..+0.00525) | submissions/sub_rover7.csv built; public pending; w=1.2 beat w=1.0 and w=0.7 for wide | Keep (recommend submit) |
 
 Workstreams: `data-metric`, `trocr`, `vlm`, `ensemble`, `analysis`, `submission`.
 Decision values: keep, rerun, improve, ensemble, drop.
