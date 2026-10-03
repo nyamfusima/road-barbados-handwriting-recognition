@@ -5,7 +5,10 @@ data/
 !preds/**/*.csv
 *.zip
 manifest-*.json
-hey
+*.7z
+*.tar
+*.tar.gz
+*.tgz
 
 # Images
 *.jpg
@@ -27,6 +30,13 @@ hey
 checkpoints/
 weights/
 models/
+runs/
+lora/
+ckpt/
+outputs/
+unsloth_compiled_cache/
+*.gguf
+adapter_model*
 
 # Submissions
 submission*.csv
