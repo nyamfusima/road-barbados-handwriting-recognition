@@ -176,38 +176,54 @@ Final ensemble including the new members:
 # TBD: python src/ensemble_rover.py --method rover-char --preds ... --weights ... --margin 0.0 --out submissions/sub_roverN.csv
 ```
 
-## 5. qwen3-8b (Qwen3-VL-8B-Instruct, Transformers + PEFT, no Unsloth)
+## 5. qwen3-vl-8b-sft (Qwen3-VL-8B-Instruct, Transformers + PEFT)
 
-`src/train_qwen3.py`: same data, split, prompt, cleaning, metric and output files as `train_qwen.py`.
-LoRA r16 (alpha 16) on the language q/k/v/o/gate/up/down and vision-block attention/MLP linears;
-lr 2e-4, 5% warmup, bs 1 x accum 8, 3 epochs, greedy. Image sides are rounded to multiples of 32, so
-`--img-height 140` trains on 128 px lines. 32B: `--model Qwen/Qwen3-VL-32B-Instruct --load-4bit`.
-Checkpoints every 200 steps in `{out}/ckpt`; rerun the same command with `--resume` after a disconnect.
+This is an independent `src/train_qwen3.py` pipeline. It reproduces `train_qwen.py`'s
+competition resize, prompt, label cleaning, split, and leaderboard metric. It uses language
+LoRA on q/k/v/o projections by default, batch 1 x accumulation 8, 3 epochs, lr 2e-4,
+5% warmup, AdamW, seed 3407, greedy decoding, and 64 new tokens. The processor resize is
+disabled; the competition-resized image is padded to the processor patch grid without
+resampling. Optional `--vision-lora` only enables compatible vision projections.
 
-Colab A100 (bf16). Drive at /content/drive, repo at /content/repo, data at /content/work.
+Install in a fresh Colab or Kaggle GPU session:
 ```bash
-cd /content/repo && git pull
-pip install -q "transformers>=4.57" peft accelerate bitsandbytes
-
-# smoke: 40 steps + 48 val lines, prints s/step, s/line and the full-run estimate (< 20 min)
-python src/train_qwen3.py --data-dir /content/work --img-dir /content/work/images \
-    --split /content/work/splits/split_v1.csv --out /content/drive/MyDrive/barbados/qwen3-8b-smoke \
-    --seed 3407 --img-height 140 --smoke
-
-# full run
-python src/train_qwen3.py --data-dir /content/work --img-dir /content/work/images \
-    --split /content/work/splits/split_v1.csv --out /content/drive/MyDrive/barbados/qwen3-8b \
-    --seed 3407 --img-height 140 --predict-test
+pip install -U "transformers>=4.57.0" peft accelerate bitsandbytes pandas pillow
 ```
 
-Kaggle T4 (fp16 + loss scaling, 4-bit NF4 base):
+Colab A100 smoke run (40 optimizer updates and 48 validation lines):
 ```bash
-python src/data_prep.py --raw-dir $DATA --skip-images --split-dir /kaggle/working/splits \
-    --report /kaggle/working/data_audit.md          # md5 must be 61d5a1a939e97a442dc635bcb63adb1d
-python src/train_qwen3.py --data-dir $DATA --img-dir $DATA/images/images \
-    --split /kaggle/working/splits/split_v1.csv --out /kaggle/working/runs/qwen3-8b \
-    --seed 3407 --img-height 140 --load-4bit --predict-test
+python src/train_qwen3.py --data-dir /content/work/raw --img-dir /content/work/images \
+  --split /content/work/splits/split_v1.csv \
+  --out /content/drive/MyDrive/barbados/qwen3-vl-8b-smoke --smoke
 ```
 
-Then: `cp {out}/val_predictions.csv preds/val/qwen3-8b.csv; cp {out}/submission.csv preds/test/qwen3-8b.csv`.
-- Val LB: TBD | Public: TBD | Ensemble weight: TBD
+Colab A100 full run:
+```bash
+python src/train_qwen3.py --data-dir /content/work/raw --img-dir /content/work/images \
+  --split /content/work/splits/split_v1.csv \
+  --out /content/drive/MyDrive/barbados/qwen3-vl-8b-sft \
+  --model Qwen/Qwen3-VL-8B-Instruct --epochs 3 --lr 2e-4 --bs 1 \
+  --grad-accum 8 --rank 16 --alpha 16 --img-height 140 --max-width 2240 \
+  --seed 3407 --predict-test
+```
+
+Kaggle T4 smoke run (4-bit NF4 base):
+```bash
+python src/train_qwen3.py --data-dir $DATA --img-dir $IMG \
+  --split /kaggle/working/splits/split_v1.csv \
+  --out /kaggle/working/qwen3-vl-8b-smoke --smoke --load-4bit
+```
+
+Kaggle T4 full run:
+```bash
+python src/train_qwen3.py --data-dir $DATA --img-dir $IMG \
+  --split /kaggle/working/splits/split_v1.csv \
+  --out /kaggle/working/qwen3-vl-8b-sft --model Qwen/Qwen3-VL-8B-Instruct \
+  --epochs 3 --lr 2e-4 --bs 1 --grad-accum 8 --rank 16 --alpha 16 \
+  --img-height 140 --max-width 2240 --seed 3407 --predict-test --load-4bit
+```
+
+Smoke and full expected times are measured from the current GPU and written to
+`run_config.json`; no timing result exists until the first remote smoke. Output files are
+`val_predictions.csv`, `val_metrics.json`, `run_config.json`, and (with `--predict-test`)
+`submission.csv`. Val LB, WER, CER, and public result are pending.
