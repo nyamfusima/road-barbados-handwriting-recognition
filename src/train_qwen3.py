@@ -33,6 +33,23 @@ PROMPT = ("Transcribe this handwritten line from an 18th or 19th century Barbado
           "Output only the transcription.")
 MODEL = "Qwen/Qwen3-VL-8B-Instruct"
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]
+MLP_MODULES = ["gate_proj", "up_proj", "down_proj"]
+# Qwen3-VL's vision tower uses fused attention (attn.qkv, attn.proj) and mlp.linear_fc1/fc2 -- NOT q/k/v/o_proj
+VISION_MODULES = ["qkv", "proj", "linear_fc1", "linear_fc2"]
+
+
+def select_lora_targets(names, vision_lora=False, mlp_lora=False):
+    """Pick LoRA target layer names from the model's linear layer names.
+    Default: language attention q/k/v/o (original behaviour).
+    mlp_lora: also the language MLP gate/up/down projections.
+    vision_lora: also the vision tower's attn.qkv, attn.proj, mlp.linear_fc1/fc2."""
+    def is_vision(n):
+        return ".visual." in f".{n}."
+    lang_set = TARGET_MODULES + (MLP_MODULES if mlp_lora else [])
+    targets = sorted(n for n in names if not is_vision(n) and n.rsplit(".", 1)[-1] in lang_set)
+    if vision_lora:
+        targets += sorted(n for n in names if is_vision(n) and n.rsplit(".", 1)[-1] in VISION_MODULES)
+    return targets
 
 
 def clean(text: str) -> str:
@@ -93,7 +110,10 @@ def parse_args():
     ap.add_argument("--resume", default=None, help="checkpoint directory or PEFT adapter directory")
     ap.add_argument("--load-4bit", action="store_true")
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--vision-lora", action="store_true", help="also adapt compatible visual attention projections")
+    ap.add_argument("--vision-lora", action="store_true",
+                    help="also adapt the vision tower (attn.qkv, attn.proj, mlp.linear_fc1/fc2)")
+    ap.add_argument("--mlp-lora", action="store_true",
+                    help="also adapt the language MLP projections (gate/up/down), as the Unsloth 7B recipe does")
     return ap.parse_args()
 
 
@@ -183,19 +203,13 @@ def main() -> None:
     else:
         if a.load_4bit:
             model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
-        linear_names = [(name, module) for name, module in model.named_modules()
-                        if isinstance(module, torch.nn.Linear)]
-        targets = sorted({name for name, _ in linear_names
-                          if ".visual." not in f".{name}." and name.rsplit(".", 1)[-1] in TARGET_MODULES})
-        if not targets:
+        linear_names = [name for name, module in model.named_modules() if isinstance(module, torch.nn.Linear)]
+        targets = select_lora_targets(linear_names, a.vision_lora, a.mlp_lora)
+        if not any(".visual." not in f".{n}." for n in targets):
             raise RuntimeError("No language q_proj/k_proj/v_proj/o_proj linear layers found")
-        if a.vision_lora:
-            vision_targets = sorted(name for name, _ in linear_names
-                                    if ".visual." in f".{name}." and name.rsplit(".", 1)[-1] in TARGET_MODULES)
-            if not vision_targets:
-                raise RuntimeError("--vision-lora requested, but no compatible visual q/k/v/o projection layers were found")
-            targets.extend(vision_targets)
-            print(f"vision LoRA targets: {vision_targets}", flush=True)
+        if a.vision_lora and not any(".visual." in f".{n}." for n in targets):
+            raise RuntimeError("--vision-lora requested, but no vision attn.qkv/attn.proj/mlp.linear_fc layers were found")
+        print(f"LoRA targets: {len(targets)} layers (vision_lora={a.vision_lora}, mlp_lora={a.mlp_lora})", flush=True)
         model = get_peft_model(model, LoraConfig(r=a.rank, lora_alpha=a.alpha, lora_dropout=0.0,
             bias="none", task_type="CAUSAL_LM", target_modules=targets))
 
